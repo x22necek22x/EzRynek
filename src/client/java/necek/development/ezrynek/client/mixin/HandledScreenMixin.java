@@ -15,14 +15,19 @@ public class HandledScreenMixin {
     private void renderCustomOverlay(MatrixStack matrices, int mouseX, int mouseY, float delta, CallbackInfo ci) {
         net.minecraft.client.MinecraftClient client = net.minecraft.client.MinecraftClient.getInstance();
 
-        // Sprawdź, czy aktualnie otwarty ekran jest instancją HandledScreen
-        if (client.currentScreen != null && client.currentScreen instanceof HandledScreen) {
-            HandledScreen<?> handledScreen = (HandledScreen<?>) client.currentScreen;
-
-            // Sprawdź, czy nazwa GUI zawiera "Market"
+        if (client.currentScreen instanceof HandledScreen<?> handledScreen) {
             if (handledScreen.getTitle().getString().contains("Market")) {
-                // Jeśli tak, renderuj overlay
                 MarketInventoryHandler.renderMarketOverlay(matrices, handledScreen, client);
+            }
+        }
+    }
+
+    @Inject(method = "init", at = @At("TAIL"))
+    private void onInit(CallbackInfo ci) {
+        net.minecraft.client.MinecraftClient client = net.minecraft.client.MinecraftClient.getInstance();
+        if (client.currentScreen instanceof HandledScreen<?> handledScreen) {
+            if (handledScreen.getTitle().getString().contains("Market")) {
+                MarketInventoryHandler.markForUpdate();
             }
         }
     }
