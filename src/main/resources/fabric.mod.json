@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 1,
+  "id": "ezrynek",
+  "version": "1.0.0",
+  "name": "ezRynek",
+  "description": "Jebac nancio cwelucha, necek wysyla pozdrowienia",
+  "authors": ["necek"],
+  "license": "MIT",
+  "entrypoints": {
+    "main": ["necek.development.ezrynek.Main"],
+    "client": ["necek.development.ezrynek.client.MainClient"]
+  },
+  "mixins": [
+    {
+      "config": "ezrynek.mixins.json",
+      "environment": "client"
+    }
+  ],
+  "depends": {
+    "fabricloader": ">=0.14.21",
+    "fabric-api": "*"
+  }
+}
