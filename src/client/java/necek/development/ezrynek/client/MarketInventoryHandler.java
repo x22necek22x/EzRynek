@@ -5,16 +5,10 @@ import necek.development.ezrynek.MarketItem;
 import necek.development.ezrynek.ModConfig;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
-import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
-import net.fabricmc.fabric.api.client.rendering.v1.HudRenderCallback;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.DrawableHelper;
-import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.client.gui.screen.ingame.HandledScreen;
-import net.minecraft.client.gui.screen.ingame.HandledScreens;
 import net.minecraft.client.util.math.MatrixStack;
-import net.minecraft.enchantment.Enchantment;
-import net.minecraft.enchantment.EnchantmentHelper;
 import net.minecraft.item.ItemStack;
 import net.minecraft.nbt.NbtCompound;
 import net.minecraft.nbt.NbtList;
@@ -24,6 +18,7 @@ import net.minecraft.text.Text;
 import net.minecraft.util.Identifier;
 import net.minecraft.util.registry.Registry;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -37,47 +32,40 @@ public class MarketInventoryHandler extends DrawableHelper {
             29, 30, 31, 32, 33, 34, 35
     };
 
-    public static void register() {
-//        HudRenderCallback.EVENT.register((drawContext, tickDelta) -> {
-//            MinecraftClient client = MinecraftClient.getInstance();
-//            if (client.currentScreen instanceof HandledScreen<?> handledScreen) {
-//                if (handledScreen.getTitle().getString().contains("Market")) {
-//                    renderMarketOverlay(drawContext, handledScreen, client);
-//                }
-//            }
-//        });
-    }
+    private static boolean needsUpdate = true;
+    private static List<Slot> highlightedSlots = new ArrayList<>();
 
     public static void renderMarketOverlay(MatrixStack matrices, HandledScreen<?> screen, MinecraftClient client) {
         ScreenHandler handler = screen.getScreenHandler();
-
-        // Oblicz pozycję GUI na ekranie
         int guiLeft = (screen.width - 176) / 2;
         int guiTop = (screen.height - 166) / 2 - 28;
 
-        ModConfig config = ModConfig.getInstance();
-        List<MarketItem> marketItems = config.getMarketItems();
-
         client.textRenderer.drawWithShadow(matrices, Text.of("ezRynek mod by necek/czatdzipiti"), 2, 2, 0xFF5555);
-        client.textRenderer.drawWithShadow(matrices, Text.of("Jebac cwela nancio | discord.gg/aNrkuVeWgX"), 2, 8 + 6, 0xFF5555);
+        client.textRenderer.drawWithShadow(matrices, Text.of("Jebac cwela nancio | discord.gg/aNrkuVeWgX"), 2, 14, 0xFF5555);
 
-        for (int slotIndex : MARKET_SLOTS) {
-            Slot slot = handler.getSlot(slotIndex);
-            ItemStack stack = slot.getStack();
+        if (needsUpdate) {
+            highlightedSlots.clear();
+            ModConfig config = ModConfig.getInstance();
+            List<MarketItem> marketItems = config.getMarketItems();
 
-            if (!stack.isEmpty()) {
-                for (MarketItem marketItem : marketItems) {
-                    if (isMatchingItem(stack, marketItem)) {
-                        drawSlotHighlight(matrices, guiLeft, guiTop, slot, client);
-                        break;
-                    } else {
-                        if (ModConfig.getInstance().isDebugEnabled()) {
-                            sendDebugMessage("Slot: " + slotIndex + ", Item: " + stack.getItem().getName().getString());
-                            sendDebugMessage("Matching Item: " + marketItem.getDisplayName());
+            for (int slotIndex : MARKET_SLOTS) {
+                Slot slot = handler.getSlot(slotIndex);
+                ItemStack stack = slot.getStack();
+
+                if (!stack.isEmpty()) {
+                    for (MarketItem marketItem : marketItems) {
+                        if (isMatchingItem(stack, marketItem)) {
+                            highlightedSlots.add(slot);
+                            break;
                         }
                     }
                 }
             }
+            needsUpdate = false;
+        }
+
+        for (Slot slot : highlightedSlots) {
+            drawSlotHighlight(matrices, guiLeft, guiTop, slot, client);
         }
     }
 
@@ -94,10 +82,10 @@ public class MarketInventoryHandler extends DrawableHelper {
     private static boolean hasRequiredEnchantments(ItemStack stack, Map<String, Integer> requiredEnchantments) {
         if (requiredEnchantments.isEmpty()) return true;
 
-        Map<Enchantment, Integer> itemEnchantments = EnchantmentHelper.get(stack);
+        Map<net.minecraft.enchantment.Enchantment, Integer> itemEnchantments = net.minecraft.enchantment.EnchantmentHelper.get(stack);
         return requiredEnchantments.entrySet().stream()
                 .allMatch(entry -> {
-                    Enchantment enchant = Registry.ENCHANTMENT.get(new Identifier(entry.getKey()));
+                    net.minecraft.enchantment.Enchantment enchant = Registry.ENCHANTMENT.get(new Identifier(entry.getKey()));
                     return itemEnchantments.getOrDefault(enchant, 0) >= entry.getValue();
                 });
     }
@@ -109,8 +97,7 @@ public class MarketInventoryHandler extends DrawableHelper {
         if (lore == null) return false;
 
         return requiredLore.stream()
-                .anyMatch(required -> lore.stream()
-                        .anyMatch(line -> line.getString().contains(required)));
+                .anyMatch(required -> lore.stream().anyMatch(line -> line.getString().contains(required)));
     }
 
     private static boolean isPriceValid(ItemStack stack, int configPrice) {
@@ -124,16 +111,9 @@ public class MarketInventoryHandler extends DrawableHelper {
     private static void drawSlotHighlight(MatrixStack matrices, int guiLeft, int guiTop, Slot slot, MinecraftClient client) {
         int x = guiLeft + slot.x;
         int y = guiTop + slot.y;
-        int color = 0x8000FF00;  // Zielony z 50% przezroczystością
+        int color = 0x8000FF00;
 
-        // Rysowanie prostokąta
         fill(matrices, x, y, x + 16, y + 16, color);
-    }
-
-    private static void sendDebugMessage(String message) {
-        if (MinecraftClient.getInstance().player != null) {
-            MinecraftClient.getInstance().player.sendMessage(Text.of(message), false);
-        }
     }
 
     private static List<Text> getLore(ItemStack stack) {
@@ -142,9 +122,7 @@ public class MarketInventoryHandler extends DrawableHelper {
             NbtCompound display = nbt.getCompound("display");
             if (display.contains("Lore", 9)) {
                 NbtList loreList = display.getList("Lore", 8);
-                return loreList.stream()
-                        .map(tag -> Text.Serializer.fromJson(tag.asString()))
-                        .collect(Collectors.toList());
+                return loreList.stream().map(tag -> Text.Serializer.fromJson(tag.asString())).collect(Collectors.toList());
             }
         }
         return null;
@@ -156,5 +134,9 @@ public class MarketInventoryHandler extends DrawableHelper {
             return nbt.getInt("CustomModelData");
         }
         return 0;
+    }
+
+    public static void markForUpdate() {
+        needsUpdate = true;
     }
 }
